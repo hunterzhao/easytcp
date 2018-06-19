@@ -2,6 +2,7 @@ package easytcp
 
 import (
     "net"
+    "fmt"
 )
 
 type Config struct {
@@ -35,6 +36,7 @@ func (s *Server) Listen(listener *net.TCPListener) {
     }()
 
     for {
+        fmt.Printf("wait for another conn\n")
         conn, err := listener.AcceptTCP()
         if err != nil {
            return

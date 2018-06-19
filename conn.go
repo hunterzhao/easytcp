@@ -3,6 +3,7 @@ package easytcp
 import (
     "fmt"
     "net"
+    "sync"
 )
 
 type Conn struct {
@@ -11,6 +12,7 @@ type Conn struct {
     closeChan   chan struct{}
     sendChan    chan Packet
     receiveChan chan Packet
+    closeOnce   sync.Once
 }
 
 func newConn (conn *net.TCPConn, s *Server) *Conn {
@@ -22,10 +24,25 @@ func newConn (conn *net.TCPConn, s *Server) *Conn {
         receiveChan:  make(chan Packet, s.config.MaxLengthofPackage),
     }
 }
+
+func (c *Conn) Close() {
+    c.closeOnce.Do(func(){
+        close(c.closeChan)
+        close(c.receiveChan)
+        close(c.sendChan)
+        c.clientConn.Close()
+        c.server.callback.OnClose(c)
+    })
+}
+
 func (c *Conn) Run() {
     c.server.callback.OnConnect(c)
 
     go func() {
+        defer func() {
+            c.Close()
+        }()
+
         for {
            select {
               case <-c.closeChan:
@@ -33,33 +50,44 @@ func (c *Conn) Run() {
                   return
               default:
            }
-           packet, _ := c.server.protocol.ReadPacket(c.clientConn)
-           c.receiveChan <- packet
+           if packet, err := c.server.protocol.ReadPacket(c.clientConn); err != nil {
+               return
+           } else {
+               c.receiveChan <- packet
+           }
         }
     }()
 
     go func() {
+        defer func() {
+            c.Close()
+        }()
         for {
             select {
             case <-c.closeChan:
                 fmt.Printf("conn is been closed\n")
                 return
             case p :=<- c.receiveChan:
-                c.server.callback.OnMessage(c, p)
-
+                if p != nil {
+                   c.server.callback.OnMessage(c, p)
+               }
             }
-
         }
     }()
 
     go func() {
+        defer func() {
+            c.Close()
+        }()
         for {
             select {
             case <-c.closeChan:
                 fmt.Printf("conn is been closed\n")
                 return
             case p :=<- c.sendChan:
-                c.clientConn.Write(p.Serialize())
+                if p != nil{
+                   c.clientConn.Write(p.Serialize())
+                }
             }
         }
     }()

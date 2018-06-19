@@ -29,10 +29,10 @@ func (e * EchoProto) ReadPacket (conn *net.TCPConn) (easytcp.Packet, error) {
     message,err := reader.ReadString('\n')
     fmt.Printf("read a packet : %s", message)
     if err != nil {
-            conn.Close()
-            //return easytcp.Packet{}, err
-        }
-        return &EchoPacket {
-            content: message,
-        }, nil
+    //        conn.Close()
+    return &EchoPacket{content:""}, err
     }
+    return &EchoPacket {
+            content: message,
+    }, nil
+}
