@@ -25,7 +25,7 @@ func (c *EchoCallback) OnClose(conn *easytcp.Conn) {
 func (c *EchoCallback) OnMessage(conn *easytcp.Conn, p easytcp.Packet) {
     ep := p.(*echo.EchoPacket)
 
-    fmt.Printf("got a new message : %s \n", ep.GetContent())
+    fmt.Printf("got a new message : %s ", ep.GetContent())
 }
 
 func main() {

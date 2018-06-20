@@ -4,6 +4,7 @@ import (
     "fmt"
     "net"
     "sync"
+    "sync/atomic"
 )
 
 type Conn struct {
@@ -13,6 +14,7 @@ type Conn struct {
     sendChan    chan Packet
     receiveChan chan Packet
     closeOnce   sync.Once
+    closeFlag   int32
 }
 
 func newConn (conn *net.TCPConn, s *Server) *Conn {
@@ -25,8 +27,13 @@ func newConn (conn *net.TCPConn, s *Server) *Conn {
     }
 }
 
+func (c *Conn) IsClosed() bool {
+    return atomic.LoadInt32(&c.closeFlag) == 1
+}
+
 func (c *Conn) Close() {
     c.closeOnce.Do(func(){
+        atomic.StoreInt32(&c.closeFlag, 1)
         close(c.closeChan)
         close(c.receiveChan)
         close(c.sendChan)
@@ -68,7 +75,7 @@ func (c *Conn) Run() {
                 fmt.Printf("conn is been closed\n")
                 return
             case p :=<- c.receiveChan:
-                if p != nil {
+                if c.IsClosed() != true {
                    c.server.callback.OnMessage(c, p)
                }
             }
@@ -85,7 +92,7 @@ func (c *Conn) Run() {
                 fmt.Printf("conn is been closed\n")
                 return
             case p :=<- c.sendChan:
-                if p != nil{
+                if c.IsClosed() != true{
                    c.clientConn.Write(p.Serialize())
                 }
             }
